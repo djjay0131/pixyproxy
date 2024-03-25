@@ -1,35 +1,19 @@
-The task at hand is to design a REST API using Python's FastAPI framework. The API will be used to manage 'prompts'.
-Each prompt will have a GUID for public identification, an integer ID for internal use, content, a display name, a list
-of tags, an author, and timestamps.
+PixyProxy is a system designed to provide API endpoints for image creation from prompts, storage of image metadata and content, listing of image details, and delivery of image content. 
 
-The API will be divided into two sections: public and private. The public section will provide read-only access to a set
-of public prompts without requiring a login. The private section, in addition to providing access to public prompts,
-will allow users to create and edit their own personal prompts. Users will have the ability to browse through public,
-private, or all prompts.
+The system is built on Python and uses the FastAPI framework to manage images generated from LLM prompts. Each image is uniquely identified by a GUID for public use and an internal integer ID. Additional data associated with each image includes the image data itself, the filename, the prompt used for its generation, and timestamps.
 
-The API will be structured into four layers: database, service, core, and web.
+Users can interact with the API to generate an image from a provided prompt and retrieve one or multiple images along with their details.
 
-1. The database layer, located in the `/data` directory, will use a repository pattern and MySQL. It will implement
-   conversions between models and dictionaries for efficiency and use named parameters for SQL commands. The
-   initialization logic will be contained in an `init.py` module.
+The API is structured into four distinct layers:
 
-2. The service layer, located in the `/service` directory, will handle requests for public and private prompts in
-   separate modules. It will revalidate incoming models from the web layer using pydantic. All exceptions, whether they
-   originate from the database or service layer, will be formatted as a `PromptException`.
+1. The `/data` layer serves as the database layer, adopting a repository pattern. MySQL is used for storing relational data, while a /images folder is used for storing the images. This layer is also responsible for converting models to dictionaries and vice versa for efficiency. SQL commands utilize named parameters, and initialization logic is contained in an `init.py` module.
 
-3. The core layer, located in the `/core` directory, will focus on models and exceptions, all of which will
-   extend `PromptException`.
+2. The `/service` layer is responsible for handling image prompt requests. Models incoming from the web layer are revalidated using pydantic. All exceptions, whether originating from the database or service layer, are handled using a general `ImagePromptException` format.
 
-4. The web layer, located in the `/web` directory, will contain separate resources for managing public and private
-   prompts. It will use a dependency pattern to ensure that private resource methods require authentication. It will
-   also incorporate a dependency for universal logging of all requests.
+3. The `/core` layer is centered around models and exceptions, all of which extend `ImagePromptException`.
 
-The API will support various functionalities through its endpoints. These include searching by text, tag,
-classification, and requesting all prompts with pagination constraints. All responses will be in JSON format. After
-login, users will have access to additional endpoints for adding, modifying, and deleting private prompts. These
-endpoints will support Basic Authentication.
+4. The `/web` layer, or the resource layer, handles image prompts. It employs a dependency pattern to ensure authenticated access to methods and includes a dependency for universal logging of all requests.
 
-The API will also implement universal request logging in the
-format `YYYY-MM-DD HH:min:sec,ms {{LoggingLevel}} {{request-id}} [thread-id] [method:line number] REQUEST START  (or REQUEST END)`.
-The request-id will be generated from the host-datetime-threadid. All exceptions will be handled by a single exception
-handler.
+The API supports operations such as searching by prompt, filename, GUID, fetching an image by GUID, and fetching all image details within pagination limits. These endpoints return responses in JSON format.
+
+The system also implements universal request logging in the format `YYYY-MM-DD HH:min:sec,ms {{LoggingLevel}} {{request-id}} [thread-id] [method:line number] REQUEST START  (or REQUEST END)`. The request-id is generated from host-datetime-threadid. All exceptions are managed by a single exception handler.

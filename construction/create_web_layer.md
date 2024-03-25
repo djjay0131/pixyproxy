@@ -3,316 +3,291 @@ Let's use FastAPI to do this.
 
 The system description is as follows:
 ```
-The task at hand is to design a REST API using Python's FastAPI framework. The API will be used to manage 'prompts'.
-Each prompt will have a GUID for public identification, an integer ID for internal use, content, a display name, a list
-of tags, an author, and timestamps.
+PixyProxy is a system designed to provide API endpoints for image creation from prompts, storage of image metadata and content, listing of image details, and delivery of image content. 
 
-The API will be divided into two sections: public and private. The public section will provide read-only access to a set
-of public prompts without requiring a login. The private section, in addition to providing access to public prompts,
-will allow users to create and edit their own personal prompts. Users will have the ability to browse through public,
-private, or all prompts.
+The system is built on Python and uses the FastAPI framework to manage images generated from LLM prompts. Each image is uniquely identified by a GUID for public use and an internal integer ID. Additional data associated with each image includes the image data itself, the filename, the prompt used for its generation, and timestamps.
 
-The API will be structured into four layers: database, service, core, and web.
+Users can interact with the API to generate an image from a provided prompt and retrieve one or multiple images along with their details.
 
-1. The database layer, located in the `/data` directory, will use a repository pattern and MySQL. It will implement
-   conversions between models and dictionaries for efficiency and use named parameters for SQL commands. The
-   initialization logic will be contained in an `init.py` module.
+The API is structured into four distinct layers:
 
-2. The service layer, located in the `/service` directory, will handle requests for public and private prompts in
-   separate modules. It will revalidate incoming models from the web layer using pydantic. All exceptions, whether they
-   originate from the database or service layer, will be formatted as a `PromptException`.
+1. The `/data` layer serves as the database layer, adopting a repository pattern. MySQL is used for storing relational data, while a /images folder is used for storing the images. This layer is also responsible for converting models to dictionaries and vice versa for efficiency. SQL commands utilize named parameters, and initialization logic is contained in an `init.py` module.
 
-3. The core layer, located in the `/core` directory, will focus on models and exceptions, all of which will
-   extend `PromptException`.
+2. The `/service` layer is responsible for handling image prompt requests. Models incoming from the web layer are revalidated using pydantic. All exceptions, whether originating from the database or service layer, are handled using a general `ImagePromptException` format.
 
-4. The web layer, located in the `/web` directory, will contain separate resources for managing public and private
-   prompts. It will use a dependency pattern to ensure that private resource methods require authentication. It will
-   also incorporate a dependency for universal logging of all requests.
+3. The `/core` layer is centered around models and exceptions, all of which extend `ImagePromptException`.
 
-The API will support various functionalities through its endpoints. These include searching by text, tag,
-classification, and requesting all prompts with pagination constraints. All responses will be in JSON format. After
-login, users will have access to additional endpoints for adding, modifying, and deleting private prompts. These
-endpoints will support Basic Authentication.
+4. The `/web` layer, or the resource layer, handles image prompts. It employs a dependency pattern to ensure authenticated access to methods and includes a dependency for universal logging of all requests.
 
-The API will also implement universal request logging in the
-format `YYYY-MM-DD HH:min:sec,ms {{LoggingLevel}} {{request-id}} [thread-id] [method:line number] REQUEST START  (or REQUEST END)`.
-The request-id will be generated from the host-datetime-threadid. All exceptions will be handled by a single exception
-handler.
+The API supports operations such as searching by prompt, filename, GUID, fetching an image by GUID, and fetching all image details within pagination limits. These endpoints return responses in JSON format.
 
+The system also implements universal request logging in the format `YYYY-MM-DD HH:min:sec,ms {{LoggingLevel}} {{request-id}} [thread-id] [method:line number] REQUEST START  (or REQUEST END)`. The request-id is generated from host-datetime-threadid. All exceptions are managed by a single exception handler.
 ```
 
 Let's make sure to cover the following use cases for our system:
 ```
-Here are the system use cases for the prompt management system:
+Use Case 1: Create an Image
+- Description: This use case allows users to create an image by providing a prompt. The system will generate an image based on the provided prompt.
+- Steps:
+  1. User provides a prompt.
+  2. System generates an image based on the prompt.
+  3. System stores the image, prompt, and associated metadata.
+  4. System returns the GUID of the created image.
 
-1. **Create a Prompt**: This use case involves creating a new prompt. The user must provide a name and content for the prompt. The system will generate a GUID for the prompt and store it in the database. The system will return the GUID of the newly created prompt.
+Use Case 2: Get Image Details by GUID
+- Description: This use case allows users to retrieve the details of an image by providing its GUID.
+- Steps:
+  1. User provides a GUID.
+  2. System fetches the image details associated with the provided GUID.
+  3. System returns the GUID, filename, prompt, and timestamps of the image in JSON format.
 
-2. **Update a Prompt**: This use case involves updating the content of an existing prompt. The user must provide the GUID of the prompt they wish to update, along with the new content. The system will update the content of the prompt in the database. If tags are associated with the prompt, they will be deleted and reinserted.
+Use Case 3: Get All Image Details
+- Description: This use case allows users to retrieve the details of all images stored in the system.
+- Steps:
+  1. User requests all image details.
+  2. System fetches all image details.
+  3. System returns the details of all images, including the GUID, filename, and prompt, in JSON format.
 
-3. **Delete a Prompt**: This use case involves deleting an existing prompt. The user must provide the GUID of the prompt they wish to delete. The system will remove the prompt and any associated tags from the database.
-
-4. **Get a Prompt**: This use case involves retrieving a prompt by its GUID. The user must provide the GUID of the prompt they wish to retrieve. The system will return the prompt and any associated tags in JSON format.
-
-5. **Add a Tag to a Prompt**: This use case involves adding a tag to an existing prompt. The user must provide the GUID of the prompt and the tag they wish to add. The system will associate the tag with the prompt in the database.
-
-6. **Remove a Tag from a Prompt**: This use case involves removing a tag from an existing prompt. The user must provide the GUID of the prompt and the tag they wish to remove. The system will disassociate the tag from the prompt in the database.
-
-7. **List all Public Prompts**: This use case involves retrieving all public prompts. The system will return a list of all public prompts in JSON format.
-
-8. **Authentication**: This use case involves authenticating a user. The user must provide their credentials. The system will verify the credentials and, if they are valid, allow the user to perform operations on private prompts.
-
-All these operations can also be performed on private prompts after authentication has occurred. The system will use HTTP basic authentication against a known set of users.
+Use Case 4: Retrieve an Image
+- Description: This use case allows users to retrieve an image by providing its GUID.
+- Steps:
+  1. User provides a GUID.
+  2. System fetches the image associated with the provided GUID.
+  3. System returns the image bytes in the body of the response.
 
 ```
 
-Here is the prompt service interface to use:
-```
-class PromptServiceInterface:
-    def create_prompt(self, prompt: PromptCreate) -> str:
-        """
-        Creates a new prompt in the database.
+Here is the image service interface to use:
+```python
+class ImageServiceInterface:
+    """
+    Interface for the ImageService.
+    Author: djjay
+    Date: 2022-03-30
+    """
 
-        Args:
-            prompt (PromptCreate): The prompt to create.
+    def create_image(self, image_detail: ImageDetailCreate) -> ImageDetail:
+        """
+        Creates an image.
+
+        Parameters:
+        image_detail (ImageDetailCreate): The details of the image to be created.
 
         Returns:
-            str: The GUID of the created prompt.
-
-        Raises:
-            ConstraintViolationError: If the prompt data is invalid.
-            PromptException: If an unexpected error occurs.
+        Image: The created image.
         """
         pass
 
-    def update_prompt(self, prompt: PromptUpdate) -> None:
+    def get_image_details_by_guid(self, guid: str) -> ImageDetail:
         """
-        Updates the content of an existing prompt.
+        Gets an image by GUID.
 
-        Args:
-            prompt (PromptUpdate): The prompt to update, which includes the GUID and the new content.
-
-        Raises:
-            ConstraintViolationError: If the prompt data is invalid.
-            PromptException: If an unexpected error occurs.
-        """
-        pass
-
-    def delete_prompt(self, guid: str) -> None:
-        """
-        Deletes an existing prompt.
-
-        Args:
-            guid (str): The GUID of the prompt to delete.
-
-        Raises:
-            PromptException: If an unexpected error occurs.
-        """
-        pass
-
-    def get_prompt(self, guid: str) -> Prompt:
-        """
-        Retrieves a prompt by its GUID.
-
-        Args:
-            guid (str): The GUID of the prompt to retrieve.
+        Parameters:
+        guid (str): The GUID of the image.
 
         Returns:
-            Prompt: The retrieved prompt.
-
-        Raises:
-            PromptException: If an unexpected error occurs.
+        ImageDetail: The details of the image.
         """
         pass
 
-    def add_tag_to_prompt(self, guid: str, tag: str) -> None:
+    def get_all_image_details(self) -> List[ImageDetail]:
         """
-        Adds a tag to an existing prompt.
-
-        Args:
-            guid (str): The GUID of the prompt to add the tag to.
-            tag (str): The tag to add.
-
-        Raises:
-            PromptException: If an unexpected error occurs.
-        """
-        pass
-
-    def remove_tag_from_prompt(self, guid: str, tag: str) -> None:
-        """
-        Removes a tag from an existing prompt.
-
-        Args:
-            guid (str): The GUID of the prompt to remove the tag from.
-            tag (str): The tag to remove.
-
-        Raises:
-            PromptException: If an unexpected error occurs.
-        """
-        pass
-
-    def list_all_public_prompts(self) -> List[Prompt]:
-        """
-        Retrieves all public prompts.
+        Gets all image details.
 
         Returns:
-            List[Prompt]: A list of all public prompts.
-
-        Raises:
-            PromptException: If an unexpected error occurs.
+        List[ImageDetail]: The details of all images.
         """
         pass
-        
-# service/user_service.py
-import traceback
 
-from pydantic import ValidationError
+    def get_image_content(self, guid: str) -> bytes:
+        """
+        Gets the content of an image by GUID.
 
-from core.exceptions import PromptException, ConstraintViolationError
-from core.models import User
-from data import DatabaseContext
-from data.user_repository import UserRepositoryInterface
+        Parameters:
+        guid (str): The GUID of the image.
 
-
-class UserServiceInterface:
-    def authenticate_user(self, username: str, password: str) -> bool:
+        Returns:
+        bytes: The content of the image.
+        """
         pass
-
-
-class UserService(UserServiceInterface):
-    def __init__(self, user_repository: UserRepositoryInterface):
-        self.user_repository = user_repository
-
-    def authenticate_user(self, username: str, password: str) -> bool:
-        try:
-            user = User(user=username, password=password)
-        except ValidationError as e:
-            raise ConstraintViolationError(str(e))
-
-        with DatabaseContext():
-            try:
-                is_authenticated = self.user_repository.authenticate_user(user.user, user.password)
-                return is_authenticated
-            except PromptException as known_exc:
-                traceback.print_exc()
-                raise known_exc
-            except Exception as e:
-                traceback.print_exc()
-                raise PromptException("An unexpected error occurred while processing your request.") from e
-        
+                
 ```
 
 Here are the core model objects to use:
-```
-from datetime import datetime
-from typing import List, Optional
+```python
+class ImageDetailCreate(BaseModel):
+    prompt: str
 
-from pydantic import BaseModel
-
-
-class PromptCreate(BaseModel):
-    content: str
-    display_name: str
-    author: Optional[int] = None
-    tags: Optional[List[str]] = []
-
-
-class PromptUpdate(PromptCreate):
+class ImageDetail(ImageDetailCreate):
     guid: str
-
-
-class Prompt(PromptUpdate):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-
-class User(BaseModel):
-    user: str
-    password: str
-    class_key: str
+    filename: str
 
 ```
 
 Here are the core exceptions to use:
-```
-class PromptException(Exception):
+```python
+# Core exceptions
+class ImageException(Exception):
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
 
+# Data layer exceptions
+class DBConnectionError(ImageException):
+    def __init__(self):
+        super().__init__("A connection to the database could not be established.")
 
-class DBConnectionError(PromptException):
-    def __init__(self, message="Failed to connect to the database."):
+class RecordNotFoundError(ImageException):
+    def __init__(self):
+        super().__init__("The requested record was not found.")
+
+class ImageNotFoundError(ImageException):
+    def __init__(self):
+        super().__init__("The requested image was not found.")
+
+class ConstraintViolationError(ImageException):
+    def __init__(self):
+        super().__init__("A database constraint was violated.")
+
+# Service layer exceptions
+class DataValidationError(ImageException):
+    def __init__(self, message: str):
         super().__init__(message)
 
-
-class RecordNotFoundError(PromptException):
-    def __init__(self, message="The requested record was not found."):
+class InvalidOperationError(ImageException):
+    def __init__(self, message: str):
         super().__init__(message)
 
-
-class ConstraintViolationError(PromptException):
-    def __init__(self, message="Database constraint was violated."):
+# Web layer exceptions
+class BadRequestError(ImageException):
+    def __init__(self, message: str = "Bad request"):
         super().__init__(message)
 
-# 2. Service Layer Exceptions
-
-class DataValidationError(PromptException):
-    def __init__(self, message="Provided data is invalid."):
+class EndPointNotFoundError(ImageException):
+    def __init__(self, message: str = "Endpoint not found"):
         super().__init__(message)
 
-
-class UnauthorizedError(PromptException):
-    def __init__(self, message="Unauthorized access."):
-        super().__init__(message)
-
-
-class OperationNotAllowedError(PromptException):
-    def __init__(self, message="This operation is not allowed."):
-        super().__init__(message)
-
-
-# 3. Web Layer Exceptions
-
-class BadRequestError(PromptException):
-    def __init__(self, message="Bad request data."):
-        super().__init__(message)
-
-
-class EndpointNotFoundError(PromptException):
-    def __init__(self, message="Endpoint not found."):
-        super().__init__(message)
-
-
-class AuthenticationError(PromptException):
-    def __init__(self, message="Authentication failed."):
-        super().__init__(message)
-
+# HTTP status codes for exceptions
 EXCEPTION_STATUS_CODES = {
-    DataValidationError: 400,       # Bad Request
+    ImageException: 500,  # Internal Server Error
+    DBConnectionError: 500,  # Internal Server Error
+    RecordNotFoundError: 404,  # Not Found
+    ImageNotFoundError: 404,  # Not Found
     ConstraintViolationError: 409,  # Conflict
-    PromptException: 500,           # Internal Server Error (Generic fallback)
-    DBConnectionError: 500,         # Internal Server Error (Generic fallback)
-    RecordNotFoundError: 404,       # Not Found
-    UnauthorizedError: 401,         # Unauthorized
-    OperationNotAllowedError: 403,  # Forbidden
-    BadRequestError: 400,           # Bad Request
-    EndpointNotFoundError: 404,     # Not Found
-    AuthenticationError: 401,       # Unauthorized
+    DataValidationError: 400,  # Bad Request
+    InvalidOperationError: 400,  # Bad Request
+    BadRequestError: 400,  # Bad Request
+    EndPointNotFoundError: 404,  # Not Found
+    InvalidOperationError: 403,  # Forbidden
 }
-
 ```
 
 The web layer is responsible for validation, central exception handling with a single exception handler,
 and logging of each request (assigning a request id, logging the start and end result of each request per above).
 
-Let's create a FastAPI application with a router for public prompts and a router for private prompts.
-The public router should support read-only access to prompts before login.
-The private router should support read-write access to prompts after login.
+Let's create a FastAPI application with a router for image creation and retrieval.  The routers will live in the /web/routers folder.
 
-Let's use HTTP basic authentication for the private router, and implement a service layer repository and database level repository for user validation.
-Let's write a global dependency so all endpoints are logged using the required format.
+Let's write a global dependency so all endpoints are logged using the required format.  The logging middleware will use starlette to build a RequestIdMiddleware class, and a LoggingMiddleware class.  
 
 Let's generate a file at a time and pause to think upfront about how things will all fit together.
 
-Then let's generate an API description with enough detail to write test cases for the web layer.
+Then let's generate an API description with enough detail to write test cases for the web layer.  
+
+## Response
+
+To build the web layer for the PixyProxy system, we will follow these steps:
+
+1. Create a new FastAPI application.
+2. Define the API routes for the use cases.
+3. Implement the request handlers for each route.
+4. Implement the logging middleware.
+5. Implement the exception handler.
+6. Generate the API description.
+
+Let's start by creating the FastAPI application and defining the API routes.
+
+```python
+from fastapi import FastAPI
+from .routers import images
+
+app = FastAPI()
+
+app.include_router(images.router)
+```
+
+Next, we will implement the request handlers in the `images` router.
+
+```python
+from fastapi import APIRouter, Depends
+from ..core.models import ImageDetailCreate, ImageDetail
+from ..service.image_service import ImageServiceInterface
+
+router = APIRouter()
+
+@router.post("/images", response_model=ImageDetail)
+def create_image(image_detail: ImageDetailCreate, service: ImageServiceInterface = Depends()):
+    return service.create_image(image_detail)
+
+@router.get("/images/{guid}", response_model=ImageDetail)
+def get_image_details_by_guid(guid: str, service: ImageServiceInterface = Depends()):
+    return service.get_image_details_by_guid(guid)
+
+@router.get("/images", response_model=List[ImageDetail])
+def get_all_image_details(service: ImageServiceInterface = Depends()):
+    return service.get_all_image_details()
+
+@router.get("/images/{guid}/content")
+def get_image_content(guid: str, service: ImageServiceInterface = Depends()):
+    return service.get_image_content(guid)
+```
+
+Next, we will implement the logging middleware.
+
+```python
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+import logging
+import datetime
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request.state.request_id = f"{request.client.host}-{datetime.datetime.now()}-{id(request)}"
+        response = await call_next(request)
+        return response
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logger = logging.getLogger("uvicorn")
+        logger.info(f"{datetime.datetime.now()} INFO {request.state.request_id} [thread-id] [method:line number] REQUEST START")
+        response = await call_next(request)
+        logger.info(f"{datetime.datetime.now()} INFO {request.state.request_id} [thread-id] [method:line number] REQUEST END")
+        return response
+
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(LoggingMiddleware)
+```
+
+Next, we will implement the exception handler.
+
+```python
+from fastapi import HTTPException
+from ..core.exceptions import EXCEPTION_STATUS_CODES
+
+@app.exception_handler(Exception)
+def handle_exception(request: Request, exc: Exception):
+    status_code = EXCEPTION_STATUS_CODES.get(type(exc), 500)
+    return HTTPException(status_code=status_code, detail=str(exc))
+```
+
+Finally, we will generate the API description.
+
+```python
+app = FastAPI(
+    title="PixyProxy",
+    description="API endpoints for image creation from prompts, storage of image metadata and content, listing of image details, and delivery of image content.",
+    version="1.0.0",
+)
+```
+
+This completes the implementation of the web layer for the PixyProxy system.

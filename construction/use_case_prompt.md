@@ -1,17 +1,13 @@
 It seems like we would need the following use cases to make our API useful:
 Remember that guids are used to identify prompts.
 
-* Create a prompt.  When we create a prompt, we must specify a name and content for the prompt.
+* Create an image.  When we create an image, we must specify  content for the prompt that will be used to create the image.  
 
-* Update a prompt's content.  Tags will be updated en-masse with all being deleted before the set of tags are inserted.
+* Get Image Details by GUID.  Provide a GUID to an image and return the GUID, filename, prompt and timestamps.  JSON format.
 
-* Delete a prompt by guid which would remove it and any tags associated with it.
+* Get All Image Details.  Return all details for all images including the GUID, filename, and prompt.  JSON format.
 
-* Get a prompt by guid which would return the prompt and tags associated with it.  JSON format.
+* Retrieve an image. Provide a GUID to an image and retrieve the image bytes in the body of the response.
 
-* Add a tag to a prompt
-* Remove a tag from a prompt
-* List all public prompts. JSON format, list of prompts.
 
-All these operations can also be performed on private prompts after authentication has occurred.
-We will use HTTP basic authentication against a known set of users.
+

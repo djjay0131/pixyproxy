@@ -1,39 +1,19 @@
-You are an expert Python FastAPI architect.
+PixyProxy is a system that offers API endpoints for creating images from prompts, storing the metadata and content of these images, listing image details, and delivering image content. 
 
-Design a FastAPI REST API to manage prompts.
+The system is a Python-based FastAPI REST API that manages images generated from LLM prompts. Each image is identified by a GUID for public use and an integer ID for internal use. The image data, filename, prompt used for its generation, and timestamps are also associated with each image.
 
-Prompts have GUIDs for public IDs, int IDs for internal use,
-content, a display name, a list of tags, an author, and timestamps.
+The API allows users to provide a prompt to generate an image and retrieve one or more images with their details.
 
+The API is divided into four layers:
 
-The API is bifurcated into public and private parts:
+1. `/data` layer: This is the database layer using a repository pattern. MySQL stores relational data, and a folder called /imges to stores the images. This layer also converts models to dictionaries and vice versa for efficiency. SQL commands use named parameters, and initialization logic is in an `init.py` module.
 
-- The public part allows read-only access to a set of public prompts without login.
+2. `/service` layer: This layer handles image prompt requests. Incoming models from the web layer are revalidated using pydantic. All exceptions, whether from the database or service layer, are handled using a general `ImagePromptException` format.
 
-- The private part, besides retaining access to public prompts, enables users to create/edit their own personal prompts. Users can
-  browse public, private, or all prompts.
+3. `/core` layer: This layer focuses on models and exceptions, all extending `ImagePromptException`.
 
+4. `/web` layer: This is the resource layer handling image prompts. It uses a dependency pattern to ensure authenticated access to methods and includes a dependency for universal logging of all requests.
 
-Structure the API using database, service, core, and web layers:
+The API supports operations like searching by prompt, filename, GUID, fetching an image by GUID, and fetching all image details within pagination limits. These endpoints return JSON responses.
 
-- The `/data` database layer should use a repository pattern, and use MySQL.
-  Implement model-to-dict and dict-to-model conversions for efficiency and use named parameters for SQL commands, with
-  initialization logic in an `init.py` module.
-
-- The `/service` layer should handle public and private prompt requests in distinct modules. Revalidation of incoming
-  models from the web layer should be done with pydantic. All exceptions, originating from the database or service
-  layer, should use a general `PromptException` format.
-
-- The `/core` layer focuses on models and exceptions—all extending `PromptException`.
-
-- The `/web` resource layer will enlist separate resources to manage public and private prompts, with a dependency
-  pattern ensuring required authentication for private resource methods. Also, incorporate dependency for universal
-  logging of all requests.
-
-Endpoints will support functionality like searching by text, tag, classification and requesting all prompts, given
-pagination constraints. These will return JSON responses. Post-login, endpoints for adding, modifying, and deleting
-private prompts will also be available, with Basic Authentication support.
-
-Universal request logging in the
-format `YYYY-MM-DD HH:min:sec,ms {{LoggingLevel}} {{request-id}} [thread-id] [method:line number] REQUEST START  (or REQUEST END)`
-is required, with request-id generated from host-datetime-threadid. Use a single exception handler for all exceptions.
+The system also implements universal request logging in the format `YYYY-MM-DD HH:min:sec,ms {{LoggingLevel}} {{request-id}} [thread-id] [method:line number] REQUEST START  (or REQUEST END)`. The request-id is generated from host-datetime-threadid. All exceptions are handled by a single exception handler.
